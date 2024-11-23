@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Salary Summary for {{ month }}</h1>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Employee Name</th>
+                <th>Designation</th>
+                <th>Total Cash</th>
+                <th>Total Cheque</th>
+                <th>Total Paid</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in summary %}
+            <tr>
+                <td>{{ record[0] }}</td>
+                <td>{{ record[1] }}</td>
+                <td>{{ record[2] }}</td>
+                <td>{{ record[3] }}</td>
+                <td>{{ record[4] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <a href="/" class="btn btn-secondary mt-3">Back to Home</a>
+</div>
+{% endblock %}

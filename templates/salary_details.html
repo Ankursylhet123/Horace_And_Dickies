@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Salary Details</h1>
+
+    <h3>Employee Information</h3>
+    <p><strong>Name:</strong> {{ employee[0] }}</p>
+    <p><strong>Designation:</strong> {{ employee[1] }}</p>
+
+    <h3>Salary Payments</h3>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Payment Date</th>
+                <th>Payment Amount</th>
+                <th>Payment Type</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for payment in salary_details %}
+            <tr>
+                <td>{{ payment[0] }}</td>
+                <td>${{ "%.2f"|format(payment[1]) }}</td>
+                <td>{{ payment[2] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3>Total Salary Paid</h3>
+    <p><strong>${{ "%.2f"|format(total_salary) }}</strong></p>
+
+    <!-- Back to Employees Button -->
+    <a href="{{ url_for('employees') }}" class="btn btn-secondary mt-3">Back to Employees</a>
+    
+    <!-- Home Page Button -->
+    <a href="/" class="btn btn-success mt-3">Home Page</a>
+</div>
+{% endblock %}
