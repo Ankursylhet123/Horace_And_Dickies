@@ -27,9 +27,15 @@ def init_db():
 init_db()
 
 #Welcome route
-@app.route('/')
+@app.route('/', methods=['GET', 'HEAD'])
 def welcome():
-    return render_template('welcome.html')
+    try:
+        return render_template('welcome.html')
+    except Exception as e:
+        app.logger.error(f"Error occurred in the welcome route: {e}")
+        return "An error occurred while loading the welcome page.", 500
+
+
 
 
 # Route to Display the Add Sale Form
