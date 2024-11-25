@@ -1,8 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, make_response
 import sqlite3
 import json
+import os
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
+
 
 # Initialize the Database
 def init_db():
@@ -27,13 +29,20 @@ def init_db():
 init_db()
 
 #Welcome route
+
 @app.route('/')
 def welcome():
     try:
+        # Debugging: Print directory structure
+        print("Current working directory:", os.getcwd())
+        print("Templates directory contents:", os.listdir(os.path.join(os.getcwd(), 'templates')))
+
+        # Attempt to load the template
         return render_template('welcome.html')
     except Exception as e:
+        # Log error if template is not found or any other issue occurs
         app.logger.error(f"Error loading welcome.html: {e}")
-        return "An error occurred while loading the welcome page.", 500
+        return f"An error occurred while loading the welcome page: {e}", 500
 
 
 
