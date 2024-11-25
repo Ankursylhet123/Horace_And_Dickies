@@ -30,10 +30,10 @@ init_db()
 @app.route('/', methods=['GET', 'HEAD'])
 def welcome():
     try:
-        return render_template('welcome.html')
+      return render_template('welcome.html')
     except Exception as e:
         app.logger.error(f"Error occurred in the welcome route: {e}")
-        return "An error occurred while loading the welcome page.", 500
+        return "An error occurred", 500
 
 
 
