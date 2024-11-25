@@ -29,21 +29,12 @@ def init_db():
 init_db()
 
 #Welcome route
-
 @app.route('/')
 def welcome():
     try:
-        # Log current working directory
-        print("Current working directory:", os.getcwd())
-        
-        # Log the contents of the templates directory
-        templates_path = os.path.join(os.getcwd(), 'templates')
-        print("Templates directory contents:", os.listdir(templates_path))
-        
-        # Attempt to render the welcome.html
-        return render_template('welcome.html')
+        return "Welcome page temporarily removed. Deployment is under progress.", 200
     except Exception as e:
-        app.logger.error(f"Error loading welcome.html: {e}")
+        app.logger.error(f"Error loading welcome page: {e}")
         return f"An error occurred while loading the welcome page: {e}", 500
 
 
