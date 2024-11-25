@@ -28,13 +28,13 @@ init_db()
 
 #Welcome route
 @app.route('/')
-@app.route('/')
 def welcome():
     try:
         return render_template('welcome.html')
     except Exception as e:
         app.logger.error(f"Error loading welcome.html: {e}")
         return "An error occurred while loading the welcome page.", 500
+
 
 
 
