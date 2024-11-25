@@ -29,19 +29,15 @@ def init_db():
 init_db()
 
 #Welcome route
-@app.route('/')
-def welcome():
-    try:
-        # Log current working directory and templates directory for debugging
-        print("Current working directory:", os.getcwd())
-        templates_path = os.path.join(os.getcwd(), 'templates')
-        print("Templates directory contents:", os.listdir(templates_path))
+# Remove or comment out the welcome route
+# @app.route('/')
+# def welcome():
+#     try:
+#         return render_template('welcome.html')
+#     except Exception as e:
+#         app.logger.error(f"Error loading welcome.html: {e}")
+#         return f"An error occurred while loading the welcome page: {e}", 500
 
-        # Render the welcome page
-        return render_template('welcome.html')
-    except Exception as e:
-        app.logger.error(f"Error loading welcome.html: {e}")
-        return f"An error occurred while loading the welcome page: {e}", 500
 
 
 
@@ -51,8 +47,10 @@ def welcome():
 
 
 # Route to Display the Add Sale Form
-@app.route('/add_sale', methods=['GET', 'POST'])
-def add_sale():
+@app.route('/')
+def root():
+    return redirect(url_for('add_sale'))
+
     if request.method == 'POST':
         # Extract form data
         date = request.form.get('date')
