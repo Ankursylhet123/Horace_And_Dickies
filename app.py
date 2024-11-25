@@ -29,12 +29,20 @@ def init_db():
 init_db()
 
 #Welcome route
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/')
 def welcome():
-    if request.method == 'POST':
-        # Handle form submission or any POST-related logic
-        return "Form submitted!"
-    return render_template('welcome.html')
+    try:
+        # Log current working directory and templates directory for debugging
+        print("Current working directory:", os.getcwd())
+        templates_path = os.path.join(os.getcwd(), 'templates')
+        print("Templates directory contents:", os.listdir(templates_path))
+
+        # Render the welcome page
+        return render_template('welcome.html')
+    except Exception as e:
+        app.logger.error(f"Error loading welcome.html: {e}")
+        return f"An error occurred while loading the welcome page: {e}", 500
+
 
 
 
