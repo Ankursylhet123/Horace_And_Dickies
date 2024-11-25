@@ -32,10 +32,10 @@ init_db()
 @app.route('/')
 def welcome():
     try:
-        return "Welcome page temporarily removed. Deployment is under progress.", 200
+        return render_template('welcome.html')
     except Exception as e:
-        app.logger.error(f"Error loading welcome page: {e}")
-        return f"An error occurred while loading the welcome page: {e}", 500
+        app.logger.error(f"Error loading welcome.html: {e}")
+        return "An error occurred while loading the welcome page.", 500
 
 
 
