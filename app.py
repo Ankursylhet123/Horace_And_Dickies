@@ -33,14 +33,16 @@ init_db()
 @app.route('/')
 def welcome():
     try:
-        # Debugging: Print directory structure
+        # Log current working directory
         print("Current working directory:", os.getcwd())
-        print("Templates directory contents:", os.listdir(os.path.join(os.getcwd(), 'templates')))
-
-        # Attempt to load the template
+        
+        # Log the contents of the templates directory
+        templates_path = os.path.join(os.getcwd(), 'templates')
+        print("Templates directory contents:", os.listdir(templates_path))
+        
+        # Attempt to render the welcome.html
         return render_template('welcome.html')
     except Exception as e:
-        # Log error if template is not found or any other issue occurs
         app.logger.error(f"Error loading welcome.html: {e}")
         return f"An error occurred while loading the welcome page: {e}", 500
 
