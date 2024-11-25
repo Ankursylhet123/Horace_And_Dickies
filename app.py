@@ -32,8 +32,9 @@ def welcome():
     try:
         return render_template('welcome.html')
     except Exception as e:
-        app.logger.error(f"Error occurred in the welcome route: {e}")
-        return "An error occurred. Check the logs.", 500
+        app.logger.error(f"Error loading welcome.html: {e}")
+        return f"An error occurred: {e}", 500
+
 
 
 
