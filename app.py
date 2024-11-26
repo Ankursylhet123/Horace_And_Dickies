@@ -28,24 +28,19 @@ def init_db():
 
 init_db()
 
-#Welcome route
+# Welcome route with debugging
 @app.route('/')
 def root():
     try:
-        # Render the welcome.html template
+        # Log current directory and templates folder contents
+        print("Current Working Directory:", os.getcwd())
+        print("Templates Directory Contents:", os.listdir(os.path.join(os.getcwd(), 'templates')))
+        
+        # Render the welcome page
         return render_template('welcome.html')
     except Exception as e:
-        # Log the error and return an error message
         app.logger.error(f"Error loading welcome.html: {e}")
         return f"An error occurred while loading the welcome page: {e}", 500
-
-
-
-
-
-
-
-
 
 # Route to Display the Add Sale Form
 @app.route('/add_sale', methods=['GET', 'POST'])
@@ -473,4 +468,5 @@ def summary():
                            monthly_totals=json.dumps(monthly_totals))
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))  # Default to 5000 if PORT is not set
+    app.run(host="0.0.0.0", port=port)
