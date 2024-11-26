@@ -30,16 +30,14 @@ init_db()
 
 #Welcome route
 @app.route('/')
-def welcome():
-    """
-    Welcome Route:
-    Redirects to the 'add_sale' route to ensure a functional landing page.
-    """
+def root():
     try:
-        return redirect(url_for('add_sale'))  # Redirects to the 'add_sale' route
+        # Render the welcome.html template
+        return render_template('welcome.html')
     except Exception as e:
-        app.logger.error(f"Error redirecting from welcome route: {e}")
-        return "An error occurred in the welcome route.", 500
+        # Log the error and return an error message
+        app.logger.error(f"Error loading welcome.html: {e}")
+        return f"An error occurred while loading the welcome page: {e}", 500
 
 
 
