@@ -29,14 +29,17 @@ def init_db():
 init_db()
 
 #Welcome route
-# Remove or comment out the welcome route
-# @app.route('/')
-# def welcome():
-#     try:
-#         return render_template('welcome.html')
-#     except Exception as e:
-#         app.logger.error(f"Error loading welcome.html: {e}")
-#         return f"An error occurred while loading the welcome page: {e}", 500
+@app.route('/')
+def welcome():
+    """
+    Welcome Route:
+    Redirects to the 'add_sale' route to ensure a functional landing page.
+    """
+    try:
+        return redirect(url_for('add_sale'))  # Redirects to the 'add_sale' route
+    except Exception as e:
+        app.logger.error(f"Error redirecting from welcome route: {e}")
+        return "An error occurred in the welcome route.", 500
 
 
 
@@ -47,36 +50,42 @@ init_db()
 
 
 # Route to Display the Add Sale Form
-@app.route('/')
-def root():
-    return redirect(url_for('add_sale'))
-
+@app.route('/add_sale', methods=['GET', 'POST'])
+def add_sale():
+    """
+    Add Sale Route:
+    Handles both GET and POST requests for adding sales.
+    """
     if request.method == 'POST':
-        # Extract form data
+        # Extract form data (ensure the form fields match this structure in your HTML)
         date = request.form.get('date')
         cash_sale = float(request.form.get('cash_sale', 0))
         card_sale = float(request.form.get('card_sale', 0))
         total_sale = cash_sale + card_sale
-        tips = float(request.form.get('tips', 0))  # Tips field
+        tips = float(request.form.get('tips', 0))
         tax = float(request.form.get('tax', 0))
         expense = float(request.form.get('expense', 0))
-
-        # Calculate profit (deduct tips, tax, and other expenses)
-        profit = (total_sale) - (tips + tax + expense)
+        profit = total_sale - (tips + tax + expense)
 
         # Save the data to the database
-        conn = sqlite3.connect('sales.db')
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO sales (date, cash_sale, card_sale, total_sale, tips, tax, expense, profit)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (date, cash_sale, card_sale, total_sale, tips, tax, expense, profit))
-        conn.commit()
-        conn.close()
-
-        return redirect(url_for('view_sales'))
+        try:
+            import sqlite3
+            conn = sqlite3.connect('sales.db')
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO sales (date, cash_sale, card_sale, total_sale, tips, tax, expense, profit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (date, cash_sale, card_sale, total_sale, tips, tax, expense, profit))
+            conn.commit()
+            conn.close()
+            return redirect(url_for('view_sales'))  # Redirect to a page to view all sales
+        except Exception as e:
+            app.logger.error(f"Error saving sale: {e}")
+            return "An error occurred while saving the sale.", 500
     else:
+        # For GET requests, show the Add Sale form
         return render_template('add_sale.html')
+
 
 
 # Route to View Sales Data
