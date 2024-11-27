@@ -246,15 +246,45 @@ def total_online_sale():
     total_sales = cursor.fetchone()[0] or 0  # Handle None case for total sales
     conn.close()
     return render_template('total_online_sale.html', sales=sales, total_sales=total_sales)
+
+
 #employee route
+# Employee route
 @app.route('/employees', methods=['GET'])
 def employees():
+    try:
+        conn = sqlite3.connect('sales.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM employees')
+        employees_data = cursor.fetchall()
+        conn.close()
+        return render_template('employees.html', employees=employees_data)
+    except sqlite3.Error as e:
+        app.logger.error(f"Database error: {e}")
+        return f"Database error: {e}", 500
+    except Exception as e:
+        app.logger.error(f"Unexpected error: {e}")
+        return f"An unexpected error occurred: {e}", 500
+
+
+
+# Initialize the employees table
+def init_employees_table():
     conn = sqlite3.connect('sales.db')
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM employees')
-    employees_data = cursor.fetchall()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS employees (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            designation TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
     conn.close()
-    return render_template('employees.html', employees=employees_data)
+# Initialize the table on app start
+init_employees_table()
+
+
 
 
 # Employees salary: Add a new employee
