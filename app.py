@@ -281,8 +281,7 @@ def init_employees_table():
     ''')
     conn.commit()
     conn.close()
-# Initialize the table on app start
-init_employees_table()
+
 
 
 
