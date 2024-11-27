@@ -186,9 +186,24 @@ def init_online_sales_db():
 init_online_sales_db()
 
 # Route for Online Sale Page
-@app.route('/online_sale', methods=['GET'])
+@app.route('/online_sale', methods=['GET', 'POST'])
 def online_sale():
+    if request.method == 'POST':
+        platform = request.form['platform']
+        sale_amount = float(request.form['sale_amount'])
+        sale_date = request.form['sale_date']
+        
+        conn = sqlite3.connect('sales.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO online_sales (platform, sale_amount, sale_date)
+            VALUES (?, ?, ?)
+        ''', (platform, sale_amount, sale_date))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('view_sales'))  # Redirect to view all sales
     return render_template('online_sale.html')
+
 
 # Route to handle Doordash sales
 @app.route('/doordash_sale', methods=['GET', 'POST'])
@@ -422,6 +437,51 @@ def salary_details(employee_id):
     return render_template('salary_details.html', salary_details=salary_details,
                            total_salary=total_salary, employee=employee)
 
+#route to expense management 
+@app.route('/expense_management', methods=['GET', 'POST'])
+def expense_management():
+    if request.method == 'POST':
+        category = request.form['category']
+        amount = float(request.form['amount'])
+        date = request.form['date']
+        
+        conn = sqlite3.connect('sales.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO expenses (category, amount, date)
+            VALUES (?, ?, ?)
+        ''', (category, amount, date))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('expense_management'))
+    
+    # Fetch all expenses for display
+    conn = sqlite3.connect('sales.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM expenses ORDER BY date DESC')
+    expenses = cursor.fetchall()
+    conn.close()
+    return render_template('expense_management.html', expenses=expenses)
+
+
+#int expense tavle
+def init_expenses_table():
+    conn = sqlite3.connect('sales.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            amount REAL NOT NULL,
+            date TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_expenses_table()
+
+
 
 
 
@@ -437,49 +497,56 @@ def salary_details(employee_id):
 # Route to View Sales Summary
 @app.route('/summary', methods=['GET'])
 def summary():
-    conn = sqlite3.connect('sales.db')
-    cursor = conn.cursor()
+    try:
+        # Connect to the database
+        conn = sqlite3.connect('sales.db')
+        cursor = conn.cursor()
 
-    # Daily summary query
-    cursor.execute('''
-        SELECT 
-            date,
-            SUM(total_sale) AS total_sales,
-            SUM(tips) AS total_tips,
-            SUM(tax) AS total_tax,
-            SUM(expense) AS total_expense,
-            SUM(profit) AS total_profit
-        FROM sales
-        GROUP BY date
-        ORDER BY date
-    ''')
-    daily_summaries = cursor.fetchall()
+        # Fetch daily summary
+        cursor.execute('''
+            SELECT 
+                date,
+                COALESCE(SUM(total_sale), 0) AS total_sales,
+                COALESCE(SUM(tips), 0) AS total_tips,
+                COALESCE(SUM(tax), 0) AS total_tax,
+                COALESCE(SUM(expense), 0) AS total_expense,
+                COALESCE(SUM(profit), 0) AS total_profit
+            FROM sales
+            GROUP BY date
+            ORDER BY date
+        ''')
+        daily_summaries = cursor.fetchall()
 
-    # Monthly summary query
-    cursor.execute('''
-        SELECT 
-            SUBSTR(date, 1, 7) AS month,  -- Extract YYYY-MM
-            SUM(total_sale) AS total_sales,
-            SUM(tips) AS total_tips,
-            SUM(tax) AS total_tax,
-            SUM(expense) AS total_expense,
-            SUM(profit) AS total_profit
-        FROM sales
-        GROUP BY month
-        ORDER BY month
-    ''')
-    monthly_summaries = cursor.fetchall()
-    conn.close()
+        # Fetch monthly summary
+        cursor.execute('''
+            SELECT 
+                SUBSTR(date, 1, 7) AS month,  -- Extract YYYY-MM
+                COALESCE(SUM(total_sale), 0) AS total_sales,
+                COALESCE(SUM(tips), 0) AS total_tips,
+                COALESCE(SUM(tax), 0) AS total_tax,
+                COALESCE(SUM(expense), 0) AS total_expense,
+                COALESCE(SUM(profit), 0) AS total_profit
+            FROM sales
+            GROUP BY month
+            ORDER BY month
+        ''')
+        monthly_summaries = cursor.fetchall()
 
-    # Debugging Output
-    print("Daily Summaries:", daily_summaries)
-    print("Monthly Summaries:", monthly_summaries)
+        conn.close()
 
-    return render_template(
-        "summary.html",
-        daily_summaries=daily_summaries,
-        monthly_summaries=monthly_summaries
-    )
+        # Render the summary template
+        return render_template(
+            "summary.html",
+            daily_summaries=daily_summaries,
+            monthly_summaries=monthly_summaries
+        )
+    except sqlite3.Error as db_error:
+        app.logger.error(f"Database error in /summary route: {db_error}")
+        return f"Database error: {db_error}", 500
+    except Exception as e:
+        app.logger.error(f"Unexpected error in /summary route: {e}")
+        return f"An unexpected error occurred: {e}", 500
+
 
 
     # Prepare data for charts
