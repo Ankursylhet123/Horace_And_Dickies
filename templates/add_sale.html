@@ -4,38 +4,65 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add Sale</title>
+    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            margin-top: 50px;
+        }
+        .card {
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        .form-control {
+            border-radius: 8px;
+        }
+        .btn-home {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+        }
+    </style>
 </head>
 <body>
-    <div class="container mt-5">
-        <h1 class="text-center">Add Sale</h1>
-        <form method="POST" action="/add_sale">
-            <div class="mb-3">
-                <label for="date" class="form-label">Date</label>
-                <input type="date" class="form-control" id="date" name="date" required>
-            </div>
-            <div class="mb-3">
-                <label for="cash_sale" class="form-label">Cash Sale</label>
-                <input type="number" class="form-control" id="cash_sale" name="cash_sale" step="0.01" required>
-            </div>
-            <div class="mb-3">
-                <label for="card_sale" class="form-label">Card Sale</label>
-                <input type="number" class="form-control" id="card_sale" name="card_sale" step="0.01" required>
-            </div>
-            <div class="mb-3">
-                <label for="tips" class="form-label">Tips</label>
-                <input type="number" class="form-control" id="tips" name="tips" step="0.01">
-            </div>
-            <div class="mb-3">
-                <label for="tax" class="form-label">Tax</label>
-                <input type="number" class="form-control" id="tax" name="tax" step="0.01">
-            </div>
-            <div class="mb-3">
-                <label for="expense" class="form-label">Expense</label>
-                <input type="number" class="form-control" id="expense" name="expense" step="0.01">
-            </div>
-            <button type="submit" class="btn btn-primary">Submit Sale</button>
-        </form>
+    <!-- Homepage Button -->
+    <a href="/" class="btn btn-secondary btn-home">Homepage</a>
+
+    <div class="container">
+        <div class="card p-4">
+            <h2 class="text-center mb-4">Add Sale</h2>
+            <form method="POST" action="/add_sale">
+                <div class="mb-3">
+                    <label for="date" class="form-label">Date</label>
+                    <input type="date" class="form-control" id="date" name="date" required>
+                </div>
+                <div class="mb-3">
+                    <label for="cash_sale" class="form-label">Cash Sale</label>
+                    <input type="number" step="0.01" class="form-control" id="cash_sale" name="cash_sale" required>
+                </div>
+                <div class="mb-3">
+                    <label for="card_sale" class="form-label">Card Sale</label>
+                    <input type="number" step="0.01" class="form-control" id="card_sale" name="card_sale" required>
+                </div>
+                <div class="mb-3">
+                    <label for="tips" class="form-label">Tips</label>
+                    <input type="number" step="0.01" class="form-control" id="tips" name="tips" required>
+                </div>
+                <div class="mb-3">
+                    <label for="tax" class="form-label">Tax</label>
+                    <input type="number" step="0.01" class="form-control" id="tax" name="tax" required>
+                </div>
+                <div class="mb-3">
+                    <label for="expense" class="form-label">Expense</label>
+                    <input type="number" step="0.01" class="form-control" id="expense" name="expense" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Submit Sale</button>
+            </form>
+        </div>
     </div>
 </body>
 </html>

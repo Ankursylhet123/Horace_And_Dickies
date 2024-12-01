@@ -3,27 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Expenses</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css">
+    <title>Expense Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1 class="mt-5">Expense Management</h1>
-        <form method="POST" action="/expense_management">
-            <div class="mb-3">
-                <label for="category" class="form-label">Category</label>
-                <input type="text" id="category" name="category" class="form-control" required>
+    <div class="container mt-5">
+        <!-- Homepage Button -->
+        <div class="mb-4">
+            <a href="/" class="btn btn-secondary">Go to Homepage</a>
+        </div>
+
+        <h1 class="text-center">Expense Management</h1>
+
+        <!-- Form to Add Expense -->
+        <form method="POST" action="/add_expense" class="my-4">
+            <div class="row">
+                <div class="col-md-3">
+                    <input type="text" name="description" class="form-control" placeholder="Description" required>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" name="amount" class="form-control" placeholder="Amount" step="0.01" required>
+                </div>
+                <div class="col-md-2">
+                    <input type="date" name="date" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                    <select name="category" class="form-control" required>
+                        <option value="Inventory">Inventory</option>
+                        <option value="Salary">Salary</option>
+                        <option value="Drinks">Drinks</option>
+                        <option value="Grocery">Grocery</option>
+                        <option value="Rent">Rent</option>
+                        <option value="Utilities">Utilities</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Add Expense</button>
+                </div>
             </div>
-            <div class="mb-3">
-                <label for="amount" class="form-label">Amount</label>
-                <input type="number" step="0.01" id="amount" name="amount" class="form-control" required>
-            </div>
-            <div class="mb-3">
-                <label for="date" class="form-label">Date</label>
-                <input type="date" id="date" name="date" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-primary">Add Expense</button>
         </form>
+
+        <!-- Table to Display Expenses -->
+        <h2 class="mt-4">Expense List</h2>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Category</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for expense in expenses %}
+                    <tr>
+                        <td>{{ expense[1] }}</td>
+                        <td>{{ expense[2] }}</td>
+                        <td>${{ expense[3] }}</td>
+                        <td>{{ expense[4] }}</td>
+                        <td>
+                            <form method="POST" action="/delete_expense" style="display:inline;">
+                                <input type="hidden" name="delete_id" value="{{ expense[0] }}">
+                                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Pagination Controls -->
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% for page in range(1, total_pages + 1) %}
+                    <li class="page-item {% if page == current_page %}active{% endif %}">
+                        <a class="page-link" href="?page={{ page }}">{{ page }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </nav>
+
+        <!-- Chart for Expenses -->
+        <h2 class="mt-4">Expense Breakdown</h2>
+        <canvas id="expenseChart" width="400" height="200"></canvas>
     </div>
+
+    <!-- Chart.js Script -->
+    <script>
+        const ctx = document.getElementById('expenseChart').getContext('2d');
+        const expenseChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: {{ expense_chart_data.labels | safe }},
+                datasets: [{
+                    data: {{ expense_chart_data.amounts | safe }},
+                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'],
+                }]
+            }
+        });
+    </script>
 </body>
 </html>
