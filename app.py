@@ -6,6 +6,49 @@ from datetime import datetime
 
 app = Flask(__name__, template_folder="templates")
 
+DATABASE = "sales.db"
+
+# Initialize Database Schema
+def init_db():
+    if not os.path.exists(DATABASE):
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        # Initialize tables
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sales (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL,
+                total_sale REAL,
+                cash_sale REAL,
+                card_sale REAL,
+                tips REAL,
+                tax REAL,
+                expense REAL,
+                profit REAL
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS employees (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                designation TEXT NOT NULL,
+                salary REAL
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS other_expenses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                expense_date TEXT NOT NULL,
+                amount REAL NOT NULL,
+                description TEXT,
+                category TEXT
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+# Call Database Initialization
+init_db()
 
 @app.route("/")
 def root():
@@ -645,70 +688,6 @@ def export_sales():
     except Exception as e:
         return f"Error: {e}", 500
 
-@app.route("/expense_management", methods=["GET", "POST"])
-def expense_management():
-    try:
-        conn = sqlite3.connect("sales.db")
-        cursor = conn.cursor()
-
-        if request.method == "POST":
-            # Retrieve form data
-            description = request.form.get("description")
-            amount = request.form.get("amount")
-            expense_date = request.form.get("expense_date")
-            category = request.form.get("category")
-
-            # Ensure table has the correct schema
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS other_expenses (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    expense_date TEXT NOT NULL,
-                    amount REAL NOT NULL,
-                    description TEXT,
-                    category TEXT
-                )
-            """)
-            
-            # Insert new expense
-            cursor.execute("""
-                INSERT INTO other_expenses (expense_date, amount, description, category)
-                VALUES (?, ?, ?, ?)
-            """, (expense_date, amount, description, category))
-            conn.commit()
-
-        # Fetch all expenses
-        cursor.execute("""
-            SELECT id, expense_date, amount, description, category
-            FROM other_expenses
-            ORDER BY expense_date DESC
-        """)
-        expenses = cursor.fetchall()
-        conn.close()
-
-        return render_template("expense_management.html", expenses=expenses)
-    except Exception as e:
-        return f"Error: {e}", 500
-
-@app.route("/delete_expense/<int:expense_id>", methods=["POST"])
-def delete_expense(expense_id):
-    try:
-        conn = sqlite3.connect("sales.db")
-        cursor = conn.cursor()
-
-        # Delete the expense with the given ID
-        cursor.execute("DELETE FROM other_expenses WHERE id = ?", (expense_id,))
-        conn.commit()
-        conn.close()
-
-        # Redirect back to the expense management page
-        return redirect(url_for("expense_management"))
-    except Exception as e:
-        return f"Error: {e}", 500
-
-
-
-
-
 
 
 
@@ -732,4 +711,4 @@ def delete_expense(expense_id):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=True, host="0.0.0.0", port=port)
