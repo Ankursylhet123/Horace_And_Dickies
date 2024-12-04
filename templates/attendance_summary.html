@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block title %}Attendance Summary{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1>Attendance Summary</h1>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Employee Name</th>
+                <th>Date</th>
+                <th>Clock In</th>
+                <th>Clock Out</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in summary %}
+            <tr>
+                <td>{{ record[0] }}</td>
+                <td>{{ record[1] }}</td>
+                <td>{{ record[2] }}</td>
+                <td>{{ record[3] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

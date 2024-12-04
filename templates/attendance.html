@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Attendance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Employee Attendance</h1>
+
+        <!-- Total Hours Worked -->
+        <h2 class="mt-4">Total Hours Worked by Employees</h2>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Employee ID</th>
+                    <th>Name</th>
+                    <th>Total Hours Worked</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in total_hours %}
+                <tr>
+                    <td>{{ record[0] }}</td>
+                    <td>{{ record[1] }}</td>
+                    <td>{{ "%.2f" | format(record[2] or 0) }} hours</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Attendance Records -->
+        <h2 class="mt-4">Attendance Records</h2>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Attendance ID</th>
+                    <th>Employee ID</th>
+                    <th>Name</th>
+                    <th>Date</th>
+                    <th>Clock In Time</th>
+                    <th>Clock Out Time</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in attendance %}
+                <tr>
+                    <td>{{ record[0] }}</td>
+                    <td>{{ record[1] }}</td>
+                    <td>{{ record[2] }}</td>
+                    <td>{{ record[3] }}</td>
+                    <td>{{ record[4] or "Not Clocked In" }}</td>
+                    <td>{{ record[5] or "Not Clocked Out" }}</td>
+                    <td>
+                        <!-- Pay Employee -->
+                        <form action="/pay_employee/{{ record[1] }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-success btn-sm">Pay Employee</button>
+                        </form>
+                        <!-- Restart Clock -->
+                        <form action="/restart_clock/{{ record[1] }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-warning btn-sm">Restart Clock</button>
+                        </form>
+                        <!-- Delete Attendance Record -->
+                        <form action="/attendance" method="POST" style="display:inline;">
+                            <input type="hidden" name="delete_id" value="{{ record[0] }}">
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Navigation -->
+        <a href="/employees" class="btn btn-secondary mt-4">Back to Employees</a>
+    </div>
+</body>
+</html>

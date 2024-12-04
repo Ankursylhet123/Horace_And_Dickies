@@ -10,12 +10,27 @@
     <div class="container mt-5">
         <h1 class="text-center">Sales Summary</h1>
 
-        <!-- Home Button -->
-        <div class="text-center my-4">
-            <a href="/" class="btn btn-primary btn-lg">Home</a>
-        </div>
+        <!-- Overall Totals -->
+        <table class="table table-striped mt-4">
+            <tr>
+                <th>Total Online Sales</th>
+                <td>${{ total_online_sales }}</td>
+            </tr>
+            <tr>
+                <th>Overall Total Sales</th>
+                <td>${{ overall_totals.sales }}</td>
+            </tr>
+            <tr>
+                <th>Total Expenses</th>
+                <td>${{ overall_totals.expenses }}</td>
+            </tr>
+            <tr>
+                <th>Overall Total Profit</th>
+                <td>${{ overall_totals.profit }}</td>
+            </tr>
+        </table>
 
-        <!-- Daily Summary Table -->
+        <!-- Daily Summary -->
         <h2>Daily Summary</h2>
         <table class="table table-striped">
             <thead>
@@ -30,19 +45,19 @@
             </thead>
             <tbody>
                 {% for row in daily_summaries %}
-                    <tr>
-                        <td>{{ row[0] }}</td>
-                        <td>${{ row[1] }}</td>
-                        <td>${{ row[2] }}</td>
-                        <td>${{ row[3] }}</td>
-                        <td>${{ row[4] }}</td>
-                        <td>${{ row[5] }}</td>
-                    </tr>
+                <tr>
+                    <td>{{ row[0] }}</td>
+                    <td>${{ row[1] }}</td>
+                    <td>${{ row[2] }}</td>
+                    <td>${{ row[3] }}</td>
+                    <td>${{ row[4] }}</td>
+                    <td>${{ row[5] }}</td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
 
-        <!-- Monthly Summary Table -->
+        <!-- Monthly Summary -->
         <h2>Monthly Summary</h2>
         <table class="table table-striped">
             <thead>
@@ -57,17 +72,22 @@
             </thead>
             <tbody>
                 {% for row in monthly_summaries %}
-                    <tr>
-                        <td>{{ row[0] }}</td>
-                        <td>${{ row[1] }}</td>
-                        <td>${{ row[2] }}</td>
-                        <td>${{ row[3] }}</td>
-                        <td>${{ row[4] }}</td>
-                        <td>${{ row[5] }}</td>
-                    </tr>
+                <tr>
+                    <td>{{ row[0] }}</td>
+                    <td>${{ row[1] }}</td>
+                    <td>${{ row[2] }}</td>
+                    <td>${{ row[3] }}</td>
+                    <td>${{ row[4] }}</td>
+                    <td>${{ row[5] }}</td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
+
+        <!-- Navigation -->
+        <div class="text-center">
+            <a href="/" class="btn btn-primary mt-4">Home</a>
+        </div>
     </div>
 </body>
 </html>

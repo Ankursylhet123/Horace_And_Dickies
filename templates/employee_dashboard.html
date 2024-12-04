@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block title %}Employee Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Employee Dashboard</h1>
+
+    <!-- Clock In/Clock Out Buttons -->
+    <div class="mb-4">
+        <button class="btn btn-primary" onclick="clockIn()">Clock In</button>
+        <button class="btn btn-danger" onclick="clockOut()">Clock Out</button>
+    </div>
+
+    <!-- Attendance Records -->
+    <h2>Your Attendance</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Clock In</th>
+                <th>Clock Out</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in attendance_records %}
+            <tr>
+                <td>{{ record[0] }}</td>
+                <td>{{ record[1] }}</td>
+                <td>{{ record[2] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- JavaScript Functions for Clock In/Clock Out -->
+<script>
+function clockIn() {
+    fetch('/clock_in/{{ employee_id }}', { method: 'POST' })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Server error: ' + response.status);
+            }
+            return response.json(); // Parse JSON if response is valid
+        })
+        .then(data => {
+            alert(data.message);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An unexpected error occurred: ' + error.message);
+        });
+}
+
+function clockOut() {
+    fetch('/clock_out/{{ employee_id }}', { method: 'POST' })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Server error: ' + response.status);
+            }
+            return response.json(); // Parse JSON if response is valid
+        })
+        .then(data => {
+            alert(data.message);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An unexpected error occurred: ' + error.message);
+        });
+}
+</script>
+{% endblock %}

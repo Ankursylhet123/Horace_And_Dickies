@@ -1,821 +1,735 @@
-from flask import Flask, render_template, request, redirect, url_for, make_response
+from flask import Flask, render_template, request, redirect, url_for, make_response, jsonify
 import sqlite3
 import json
 import os
+from datetime import datetime
 
 app = Flask(__name__, template_folder="templates")
 
 
-# Initialize the Database
-def init_db():
-    conn = sqlite3.connect("sales.db")
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS sales (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TEXT,
-            cash_sale REAL,
-            card_sale REAL,
-            total_sale REAL,
-            tips REAL,
-            tax REAL,
-            expense REAL,
-            profit REAL
-        )
-    """
-    )
-    conn.commit()
-    conn.close()
-
-
-init_db()
-
-
-# Welcome route with debugging
 @app.route("/")
 def root():
     try:
-        # Log current directory and templates folder contents
-        print("Current Working Directory:", os.getcwd())
-        print(
-            "Templates Directory Contents:",
-            os.listdir(os.path.join(os.getcwd(), "templates")),
-        )
+        conn = sqlite3.connect("sales.db")
+        cursor = conn.cursor()
 
+        cursor.execute('SELECT "Sale" AS type, datetime(date), total_sale FROM sales ORDER BY id DESC LIMIT 5')
+        sales_activity = cursor.fetchall()
+        print("Sales Activity:", sales_activity)
+
+        cursor.execute('SELECT "Online Sale" AS type, datetime(sale_date), sale_amount FROM online_sales ORDER BY id DESC LIMIT 5')
+        online_sales_activity = cursor.fetchall()
+        print("Online Sales Activity:", online_sales_activity)
+
+        cursor.execute('SELECT "Employee" AS type, datetime("now"), name || " Hired" AS action FROM employees ORDER BY id DESC LIMIT 5')
+        employees_activity = cursor.fetchall()
+        print("Employees Activity:", employees_activity)
+
+        recent_activity = sales_activity + online_sales_activity + employees_activity
+        recent_activity = [activity for activity in recent_activity if activity[1] is not None]
+        recent_activity.sort(key=lambda x: x[1], reverse=True)
+        conn.close()
+
+        return render_template("welcome.html", recent_activity=recent_activity)
+    except Exception as e:
+        return f"Error: {e}", 500
+
+
+
+@app.route("/clock_in/<int:employee_id>", methods=["POST"])
+def clock_in(employee_id):
+    try:
+        date_today = datetime.now().strftime("%Y-%m-%d")
+        clock_in_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        conn = sqlite3.connect("sales.db")
+        cursor = conn.cursor()
+
+        # Check if already clocked in today
+        cursor.execute("""
+            SELECT id FROM employee_attendance
+            WHERE employee_id = ? AND date = ? AND clock_out_time IS NULL
+        """, (employee_id, date_today))
+        if cursor.fetchone():
+            return jsonify({"success": False, "message": "Already clocked in today."})
+
+        # Record clock-in time
+        cursor.execute("""
+            INSERT INTO employee_attendance (employee_id, clock_in_time, date)
+            VALUES (?, ?, ?)
+        """, (employee_id, clock_in_time, date_today))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"success": True, "message": "Clocked in successfully!"})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+
+
+
+
+@app.route("/clock_out/<int:employee_id>", methods=["POST"])
+def clock_out(employee_id):
+    try:
+        clock_out_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        conn = sqlite3.connect("sales.db")
+        cursor = conn.cursor()
+
+        # Check if there is an open clock-in entry
+        cursor.execute("""
+            SELECT id FROM employee_attendance
+            WHERE employee_id = ? AND clock_out_time IS NULL
+        """, (employee_id,))
+        attendance = cursor.fetchone()
+
+        if not attendance:
+            return jsonify({"success": False, "message": "No open clock-in entry found."})
+
+        # Record clock-out time
+        cursor.execute("""
+            UPDATE employee_attendance
+            SET clock_out_time = ?
+            WHERE id = ?
+        """, (clock_out_time, attendance[0]))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"success": True, "message": "Clocked out successfully!"})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+
+
+
+
+
+@app.route("/add_sale", methods=["GET", "POST"])
+def add_new_sale():
+    if request.method == "POST":
+        try:
+            # Debug: Log form submission
+            print("Form submitted. Data received:", request.form)
+
+            # Get data from the form
+            date = request.form.get("date")
+            cash_sale = float(request.form.get("cash_sale"))
+            card_sale = float(request.form.get("card_sale"))
+            tips = float(request.form.get("tips"))
+            tax = float(request.form.get("tax"))
+            expense = float(request.form.get("expense"))
+
+            # Calculate total sale and profit
+            total_sale = cash_sale + card_sale
+            profit = total_sale + tips - tax - expense
+
+            # Insert data into the database
+            conn = sqlite3.connect("sales.db")
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO sales (date, cash_sale, card_sale, total_sale, tips, tax, expense, profit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (date, cash_sale, card_sale, total_sale, tips, tax, expense, profit))
+            conn.commit()
+            conn.close()
+
+            # Debug: Log successful database insertion
+            print("Data inserted successfully. Redirecting to /view_sales")
+
+            # Redirect to the View Sales page
+            return redirect(url_for("view_sales"))
+        except Exception as e:
+            print(f"Error occurred: {e}")
+            return f"Error: {e}", 500
+
+    # Render the Add Sale form
+    return render_template("add_sale.html")
+
+
+
+
+
+@app.route("/view_sales", methods=["GET"])
+def view_sales():
+    try:
         # Connect to the database
         conn = sqlite3.connect("sales.db")
         cursor = conn.cursor()
 
-        # Get the last 5 regular sales entries with timestamp
-        cursor.execute(
-            'SELECT "Sale" AS type, datetime(date), total_sale FROM sales ORDER BY id DESC LIMIT 5'
-        )
-        sales_activity = cursor.fetchall()
+        # Fetch all sales data
+        cursor.execute("""
+            SELECT id, date, total_sale, cash_sale, card_sale, tips, tax, expense, profit
+            FROM sales
+            ORDER BY id DESC
+        """)
+        sales = cursor.fetchall()
 
-        # Get the last 5 online sales entries with timestamp
-        cursor.execute(
-            'SELECT "Online Sale" AS type, datetime(sale_date), sale_amount FROM online_sales ORDER BY id DESC LIMIT 5'
-        )
-        online_sales_activity = cursor.fetchall()
-
-        # Get the last 5 employee entries with timestamp
-        cursor.execute(
-            'SELECT "Employee" AS type, datetime("now"), name || " Hired" AS action FROM employees ORDER BY id DESC LIMIT 5'
-        )
-        employees_activity = cursor.fetchall()
-
-        # Combine all activities and sort them by most recent date
-        recent_activity = sales_activity + online_sales_activity + employees_activity
-        recent_activity.sort(key=lambda x: x[1], reverse=True)  # Sort by datetime
+        # Calculate total sales and profit
+        cursor.execute("SELECT SUM(total_sale), SUM(profit) FROM sales")
+        stats = cursor.fetchone()
+        total_sales = stats[0] if stats[0] else 0.0
+        total_profit = stats[1] if stats[1] else 0.0
 
         conn.close()
 
-        # Pass the recent activity data to the template
-        return render_template("welcome.html", recent_activity=recent_activity)
+        # Render the template with sales data and stats
+        return render_template("view_sales.html", sales=sales, total_sales=total_sales, total_profit=total_profit)
     except Exception as e:
-        app.logger.error(f"Error loading welcome.html: {e}")
-        return f"An error occurred while loading the welcome page: {e}", 500
+        return f"Error: {e}", 500
 
 
-# Route to Display the Add Sale Form
-@app.route('/add_sale', methods=['GET', 'POST'])
-def add_sale():
-    if request.method == 'POST':
-        date = request.form.get('date')
-        cash_sale = float(request.form.get('cash_sale', 0))
-        card_sale = float(request.form.get('card_sale', 0))
-        tips = float(request.form.get('tips', 0))
-        tax = float(request.form.get('tax', 0))
-        expense = float(request.form.get('expense', 0))
-        total_sale = cash_sale + card_sale
-        profit = total_sale - (tips + tax + expense)
-
-        # Insert into database
-        conn = sqlite3.connect('sales.db')
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO sales (date, cash_sale, card_sale, total_sale, tips, tax, expense, profit)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (date, cash_sale, card_sale, total_sale, tips, tax, expense, profit))
-        conn.commit()
-        conn.close()
-
-        return redirect(url_for('view_sales'))  # Redirect to view_sales page
-
-    return render_template('add_sale.html')
-# Route to View Sales Data
-@app.route('/view_sales', methods=['GET'])
-def view_sales():
-    conn = sqlite3.connect('sales.db')
-    cursor = conn.cursor()
-
-    # Fetch regular sales
-    cursor.execute('''
-        SELECT id, date, cash_sale, card_sale, total_sale, tips, tax, expense, profit
-        FROM sales
-        ORDER BY date
-    ''')
-    regular_sales = cursor.fetchall()
-
-    # Fetch online sales grouped by date
-    cursor.execute('''
-        SELECT sale_date, SUM(sale_amount)
-        FROM online_sales
-        GROUP BY sale_date
-    ''')
-    online_sales = cursor.fetchall()
-    conn.close()
-
-    # Create a dictionary for online sales by date
-    online_sales_dict = {row[0]: row[1] for row in online_sales}
-
-    # Combine online sales into the regular sales data
-    combined_sales = []
-    for sale in regular_sales:
-        sale_date = sale[1]
-        total_online_sale = online_sales_dict.get(sale_date, 0)  # Default to 0 if no online sales for the date
-        updated_profit = sale[8] + total_online_sale  # Add total online sale to profit
-        combined_sales.append(sale + (total_online_sale, updated_profit))
-
-    # Prepare data for the chart
-    dates = [sale[1] for sale in combined_sales]
-    daily_totals = [sale[4] for sale in combined_sales]
-
-    return render_template('view_sales.html', sales=combined_sales, dates=json.dumps(dates), daily_totals=json.dumps(daily_totals))
-# Route to Export Sales Data as CSV
-@app.route("/export_sales", methods=["GET"])
-def export_sales():
+@app.route("/edit_sale/<int:sale_id>", methods=["GET", "POST"])
+def edit_sale(sale_id):
     conn = sqlite3.connect("sales.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM sales ORDER BY date")  # Fetch all sales data
-    sales = cursor.fetchall()
-    conn.close()
 
-    # Create CSV data
-    csv_data = "ID,Date,Cash Sale,Card Sale,Total Sale,Tips,Tax,Expense,Profit\n"
-    for sale in sales:
-        csv_data += ",".join(map(str, sale)) + "\n"
-
-    # Send the CSV data as a file response
-    response = make_response(csv_data)
-    response.headers["Content-Disposition"] = "attachment; filename=sales.csv"
-    response.headers["Content-Type"] = "text/csv"
-    return response
-
-
-## Route to Delete a Sale
-@app.route('/delete_sale', methods=['POST'])
-def delete_sale():
-    sale_id = request.form.get('sale_id')
-    if not sale_id:
-        return "Bad Request: Sale ID missing", 400
-
-    try:
-        conn = sqlite3.connect('sales.db')
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM sales WHERE id = ?', (sale_id,))
+    if request.method == "POST":
+        sale_date = request.form.get("sale_date")
+        total_sale = request.form.get("total_sale")
+        cursor.execute("UPDATE sales SET date = ?, total_sale = ? WHERE id = ?", (sale_date, total_sale, sale_id))
         conn.commit()
         conn.close()
-        return redirect(url_for('view_sales'))
-    except sqlite3.Error as e:
-        app.logger.error(f"Error deleting sale: {e}")
-        return "Internal Server Error", 500
+        return redirect(url_for("view_sales"))
 
+    cursor.execute("SELECT date, total_sale FROM sales WHERE id = ?", (sale_id,))
+    sale = cursor.fetchone()
+    conn.close()
+    return render_template("edit_sale.html", sale=sale, sale_id=sale_id)
 
-    # Redirect back to the view_sales page
-    return redirect(url_for("view_sales"))
-
-    # Create CSV data
-    csv_data = "ID,Date,Cash Sale,Card Sale,Total Sale,Tips,Tax,Expense,Profit\n"
-    for sale in sales:
-        csv_data += ",".join(map(str, sale)) + "\n"
-
-    # Send the CSV data as a file response
-    response = make_response(csv_data)
-    response.headers["Content-Disposition"] = "attachment; filename=sales.csv"
-    response.headers["Content-Type"] = "text/csv"
-    return response
-
-
-# Online Sale
-# Initialize the Database for Online Sales
-def init_online_sales_db():
+@app.route("/delete_sale/<int:sale_id>", methods=["POST"])
+def delete_sale(sale_id):
     conn = sqlite3.connect("sales.db")
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS online_sales (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            platform TEXT,
-            sale_amount REAL,
-            sale_date TEXT
-        )
-    """
-    )
+    cursor.execute("DELETE FROM sales WHERE id = ?", (sale_id,))
     conn.commit()
     conn.close()
+    return redirect(url_for("view_sales"))
 
-
-# Initialize the database at the start
-init_online_sales_db()
-
-
-# Route for Online Sale Page
-@app.route("/online_sale", methods=["GET", "POST"])
-def online_sale():
-    if request.method == "POST":
-        platform = request.form["platform"]
-        sale_amount = float(request.form["sale_amount"])
-        sale_date = request.form["sale_date"]
-
-        conn = sqlite3.connect("sales.db")
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO online_sales (platform, sale_amount, sale_date)
-            VALUES (?, ?, ?)
-        """,
-            (platform, sale_amount, sale_date),
-        )
-        conn.commit()
-        conn.close()
-        return redirect(url_for("view_sales"))  # Redirect to view all sales
-    return render_template("online_sale.html")
-
-
-# Route to handle Doordash sales
-@app.route("/doordash_sale", methods=["GET", "POST"])
-def doordash_sale():
-    if request.method == "POST":
-        sale_amount = float(request.form["sale_amount"])
-        sale_date = request.form["sale_date"]
-        conn = sqlite3.connect("sales.db")
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO online_sales (platform, sale_amount, sale_date) VALUES (?, ?, ?)",
-            ("Doordash", sale_amount, sale_date),
-        )
-        conn.commit()
-        conn.close()
-        return redirect(url_for("online_sale"))
-    return render_template("input_sale.html", platform="Doordash")
-
-
-# Route to handle Uber Eats sales
-@app.route("/ubereats_sale", methods=["GET", "POST"])
-def ubereats_sale():
-    if request.method == "POST":
-        sale_amount = float(request.form["sale_amount"])
-        sale_date = request.form["sale_date"]
-        conn = sqlite3.connect("sales.db")
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO online_sales (platform, sale_amount, sale_date) VALUES (?, ?, ?)",
-            ("Uber Eats", sale_amount, sale_date),
-        )
-        conn.commit()
-        conn.close()
-        return redirect(url_for("online_sale"))
-    return render_template("input_sale.html", platform="Uber Eats")
-
-
-# Route to handle Grubhub sales
-@app.route("/grubhub_sale", methods=["GET", "POST"])
-def grubhub_sale():
-    if request.method == "POST":
-        sale_amount = float(request.form["sale_amount"])
-        sale_date = request.form["sale_date"]
-        conn = sqlite3.connect("sales.db")
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO online_sales (platform, sale_amount, sale_date) VALUES (?, ?, ?)",
-            ("Grubhub", sale_amount, sale_date),
-        )
-        conn.commit()
-        conn.close()
-        return redirect(url_for("online_sale"))
-    return render_template("input_sale.html", platform="Grubhub")
-
-
-# Route to calculate and display total online sales
-@app.route("/total_online_sale")
-def total_online_sale():
+@app.route("/report", methods=["GET"])
+def report():
     conn = sqlite3.connect("sales.db")
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT platform, SUM(sale_amount) FROM online_sales GROUP BY platform"
-    )
-    sales = cursor.fetchall()
-    cursor.execute("SELECT SUM(sale_amount) FROM online_sales")
-    total_sales = cursor.fetchone()[0] or 0  # Handle None case for total sales
+    cursor.execute("""
+        SELECT strftime('%Y-%m', date) AS month, SUM(total_sale) AS total_sales
+        FROM sales
+        GROUP BY month
+        ORDER BY month DESC
+    """)
+    reports = cursor.fetchall()
     conn.close()
-    return render_template(
-        "total_online_sale.html", sales=sales, total_sales=total_sales
-    )
+    return render_template("report.html", reports=reports)
 
-
-# employee route
-# Employee route
 @app.route("/employees", methods=["GET"])
 def employees():
     try:
+        # Connect to the database and fetch employee data
         conn = sqlite3.connect("sales.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM employees")
-        employees_data = cursor.fetchall()
+        cursor.execute("SELECT id, name, designation FROM employees")
+        employees = cursor.fetchall()
         conn.close()
-        return render_template("employees.html", employees=employees_data)
-    except sqlite3.Error as e:
-        app.logger.error(f"Database error: {e}")
-        return f"Database error: {e}", 500
+
+        # Render the employees template with the fetched data
+        return render_template("employees.html", employees=employees)
     except Exception as e:
-        app.logger.error(f"Unexpected error: {e}")
-        return f"An unexpected error occurred: {e}", 500
+        return f"Error: {e}", 500
 
-
-# Initialize the employees table
-def init_employees_table():
-    conn = sqlite3.connect("sales.db")
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS employees (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            designation TEXT NOT NULL
-        )
-    """
-    )
-    conn.commit()
-    conn.close()
-
-
-# Employees salary: Add a new employee
-@app.route("/add_employee", methods=["GET", "POST"])
-def add_employee():
-    if request.method == "POST":
-        # Extract form data
-        name = request.form.get("name")
-        designation = request.form.get("designation")
-
-        # Insert data into the database
-        conn = sqlite3.connect("sales.db")
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO employees (name, designation) VALUES (?, ?)",
-            (name, designation),
-        )
-        conn.commit()
-        conn.close()
-
-        return redirect(url_for("employees"))
-    return render_template("add_employee.html")
-
-
-# Delete Employee
-@app.route("/delete_employee/<int:employee_id>", methods=["POST"])
-def delete_employee(employee_id):
-    conn = sqlite3.connect("sales.db")
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM employees WHERE id = ?", (employee_id,))
-    conn.commit()
-    conn.close()
-    return redirect(url_for("employees"))
-
-
-# Route to view salary summary for a specific month
-@app.route("/salary_summary", methods=["GET"])
-def salary_summary():
-    month = request.args.get("month")  # Expected format: YYYY-MM
-
-    conn = sqlite3.connect("sales.db")
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        SELECT e.name, e.designation, 
-               SUM(CASE WHEN s.payment_type = 'Cash' THEN s.payment_amount ELSE 0 END) AS total_cash,
-               SUM(CASE WHEN s.payment_type = 'Cheque' THEN s.payment_amount ELSE 0 END) AS total_cheque,
-               SUM(s.payment_amount) AS total_paid
-        FROM employees e
-        JOIN employee_salaries s ON e.id = s.employee_id
-        WHERE s.payment_date LIKE ?
-        GROUP BY e.id
-    """,
-        (f"{month}%",),
-    )
-    summary = cursor.fetchall()
-    conn.close()
-
-    return render_template("salary_summary.html", summary=summary, month=month)
-
-
-# edit employess
-@app.route("/edit_employee/<int:employee_id>", methods=["GET", "POST"])
-def edit_employee(employee_id):
-    conn = sqlite3.connect("sales.db")
-    cursor = conn.cursor()
-
-    if request.method == "POST":
-        # Handle the form submission
-        name = request.form.get("name")
-        designation = request.form.get("designation")
-
-        cursor.execute(
-            "UPDATE employees SET name = ?, designation = ? WHERE id = ?",
-            (name, designation, employee_id),
-        )
-        conn.commit()
-        conn.close()
-        return redirect(url_for("employees"))
-    else:
-        # Fetch employee data for pre-filling the form
-        cursor.execute("SELECT * FROM employees WHERE id = ?", (employee_id,))
-        employee = cursor.fetchone()
-        conn.close()
-        return render_template("edit_employee.html", employee=employee)
-
-
-# Add payment
-@app.route("/add_payment/<int:employee_id>", methods=["GET", "POST"])
-@app.route('/add_payment/<int:employee_id>', methods=['GET', 'POST'])
-def add_payment(employee_id):
-    conn = sqlite3.connect('sales.db')
-    cursor = conn.cursor()
-
-    if request.method == 'POST':
-        try:
-            # Extract form data
-            payment_amount = float(request.form['payment_amount'])
-            payment_type = request.form['payment_type']  # Cash or Cheque
-            payment_date = request.form['payment_date']
-
-            # Save payment to the database
-            cursor.execute('''
-                INSERT INTO employee_salaries (employee_id, payment_amount, payment_type, payment_date)
-                VALUES (?, ?, ?, ?)
-            ''', (employee_id, payment_amount, payment_type, payment_date))
-            conn.commit()
-        except Exception as e:
-            app.logger.error(f"Error adding payment: {e}")
-            return f"An error occurred: {e}", 500
-        finally:
-            conn.close()
-        return redirect(url_for('employees'))
-
-    # If GET request, fetch employee details for displaying on the form
-    cursor.execute('SELECT name, designation FROM employees WHERE id = ?', (employee_id,))
-    employee = cursor.fetchone()
-    conn.close()
-    if not employee:
-        return f"Employee with ID {employee_id} not found.", 404
-
-    return render_template('add_payment.html', employee_id=employee_id, employee=employee)
-# Salary details
-@app.route('/salary_details/<int:employee_id>', methods=['GET'])
+@app.route("/salary_details/<int:employee_id>")
 def salary_details(employee_id):
     try:
-        conn = sqlite3.connect('sales.db')
+        conn = sqlite3.connect("sales.db")
         cursor = conn.cursor()
 
-        # Fetch salary details for the employee
-        cursor.execute('''
-            SELECT payment_date, payment_amount, payment_type
-            FROM employee_salaries
-            WHERE employee_id = ?
-            ORDER BY payment_date
-        ''', (employee_id,))
-        salary_details = cursor.fetchall()
-
-        # Fetch total salary paid
-        cursor.execute('''
-            SELECT SUM(payment_amount)
-            FROM employee_salaries
-            WHERE employee_id = ?
-        ''', (employee_id,))
-        total_salary = cursor.fetchone()[0] or 0  # Handle None case for total salary
-
-        # Fetch employee details
-        cursor.execute('''
-            SELECT name, designation
+        # Fetch basic employee details
+        cursor.execute("""
+            SELECT id, name, designation, salary
             FROM employees
             WHERE id = ?
-        ''', (employee_id,))
+        """, (employee_id,))
         employee = cursor.fetchone()
+
+        # Fetch salary details for the employee
+        cursor.execute("""
+            SELECT date, amount, method
+            FROM employee_salary
+            WHERE employee_id = ?
+            ORDER BY date DESC
+        """, (employee_id,))
+        salary_records = cursor.fetchall()
 
         conn.close()
 
-        if not employee:
-            return f"No employee found with ID {employee_id}", 404
-
         return render_template(
-            'salary_details.html',
-            salary_details=salary_details,
-            total_salary=total_salary,
-            employee=employee
+            "salary_details.html",
+            employee=employee,
+            salary_records=salary_records
         )
-    except sqlite3.Error as e:
-        app.logger.error(f"Database error: {e}")
-        return f"Database error: {e}", 500
     except Exception as e:
-        app.logger.error(f"Unexpected error: {e}")
-        return f"An unexpected error occurred: {e}", 500
-
-#expense management
-@app.route('/expense_management', methods=['GET', 'POST'])
-def expense_management():
-    conn = sqlite3.connect('sales.db')
-    cursor = conn.cursor()
-
-    if request.method == 'POST':
-        description = request.form['description']
-        amount = float(request.form['amount'])
-        category = request.form['category']
-        date = request.form['date']
-
-        cursor.execute('INSERT INTO expenses (description, amount, category, date) VALUES (?, ?, ?, ?)',
-                       (description, amount, category, date))
-        conn.commit()
-
-    # Pagination setup
-    items_per_page = 10
-    page = int(request.args.get('page', 1))
-    offset = (page - 1) * items_per_page
-
-    # Fetch paginated expenses
-    cursor.execute('SELECT COUNT(*) FROM expenses')
-    total_items = cursor.fetchone()[0]
-    total_pages = (total_items + items_per_page - 1) // items_per_page
-
-    cursor.execute('SELECT rowid, date, description, amount, category FROM expenses ORDER BY date DESC LIMIT ? OFFSET ?',
-                   (items_per_page, offset))
-    expenses = cursor.fetchall()
-
-    # Chart data
-    cursor.execute('SELECT category, SUM(amount) FROM expenses GROUP BY category')
-    chart_data = cursor.fetchall()
-    conn.close()
-
-    labels = [row[0] for row in chart_data]
-    amounts = [row[1] for row in chart_data]
-
-    return render_template(
-        'expense_management.html',
-        expenses=expenses,
-        expense_chart_data={'labels': labels, 'amounts': amounts},
-        current_page=page,
-        total_pages=total_pages
-    )
-    # Fetch total number of expenses for pagination
-    cursor.execute('SELECT COUNT(*) FROM expenses')
-    total_expenses = cursor.fetchone()[0]
-
-    # Calculate total pages
-    total_pages = (total_expenses + per_page - 1) // per_page
-
-    # Chart data
-    cursor.execute('SELECT category, SUM(amount) FROM expenses GROUP BY category')
-    chart_data = cursor.fetchall()
-    conn.close()
-
-    labels = [row[0] for row in chart_data]
-    amounts = [row[1] for row in chart_data]
-
-    return render_template(
-        'expense_management.html',
-        expenses=expenses,
-        expense_chart_data={'labels': labels, 'amounts': amounts},
-        page=page,
-        total_pages=total_pages
-    )
-
-    
-#delete salary
-@app.route('/delete_payment/<int:payment_id>', methods=['POST'])
-def delete_payment(payment_id):
-    conn = sqlite3.connect('sales.db')
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM employee_salaries WHERE rowid = ?', (payment_id,))
-    conn.commit()
-    conn.close()
-    return redirect(request.referrer)  # Redirect back to the salary details page
+        return f"Error: {e}", 500
 
 
-
-
-
-
-
-
-
-
-
-
-# int expense tavle
-def init_expenses_table():
-    conn = sqlite3.connect("sales.db")
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS expenses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category TEXT NOT NULL,
-            amount REAL NOT NULL,
-            date TEXT NOT NULL
-        )
-    """
-    )
-    conn.commit()
-    conn.close()
-
-
-init_expenses_table()
-
-
-def recent_activity():
-    conn = sqlite3.connect("sales.db")
-    cursor = conn.cursor()
-
-    # Fetch activities
-    cursor.execute(
-        'SELECT "Sale", date, total_sale FROM sales ORDER BY date DESC LIMIT 5'
-    )
-    sales_activity = cursor.fetchall()
-
-    cursor.execute(
-        'SELECT "Employee", name, designation FROM employees ORDER BY id DESC LIMIT 5'
-    )
-    employee_activity = cursor.fetchall()
-
-    # Combine and sort activities
-    combined_activity = sales_activity + employee_activity
-    combined_activity.sort(key=lambda x: x[1], reverse=True)
-
-    conn.close()
-
-    # Return the top 5 activities
-    return combined_activity[:5]
-
-#Monthly report
-@app.route('/monthly_report', methods=['GET'])
-def monthly_report():
-    """
-    Route to generate the Monthly Performance Report.
-    """
+@app.route("/attendance", methods=["GET", "POST"])
+def attendance():
     try:
-        conn = sqlite3.connect('sales.db')
+        conn = sqlite3.connect("sales.db")
         cursor = conn.cursor()
 
-        # Query to fetch monthly performance
-        cursor.execute('''
-            SELECT 
-                strftime('%Y-%m', date) AS month, 
-                SUM(total_sale) AS total_sales,
-                SUM(tips) AS total_tips,
-                SUM(tax) AS total_tax,
-                SUM(expense) AS total_expense,
-                SUM(profit) AS total_profit
+        # Handle deletion of attendance record
+        if request.method == "POST" and "delete_id" in request.form:
+            delete_id = request.form.get("delete_id")
+            cursor.execute("DELETE FROM employee_attendance WHERE id = ?", (delete_id,))
+            conn.commit()
+
+        # Fetch attendance data
+        cursor.execute("""
+            SELECT a.id, a.employee_id, e.name, a.date, a.clock_in_time, a.clock_out_time
+            FROM employee_attendance a
+            JOIN employees e ON a.employee_id = e.id
+            ORDER BY a.date DESC, a.clock_in_time ASC
+        """)
+        attendance_data = cursor.fetchall()
+
+        # Calculate total hours worked per employee
+        cursor.execute("""
+            SELECT e.id, e.name, 
+                   SUM((julianday(a.clock_out_time) - julianday(a.clock_in_time)) * 24) AS total_hours
+            FROM employee_attendance a
+            JOIN employees e ON a.employee_id = e.id
+            WHERE a.clock_out_time IS NOT NULL
+            GROUP BY e.id, e.name
+        """)
+        total_hours_data = cursor.fetchall()
+
+        conn.close()
+
+        return render_template(
+            "attendance.html",
+            attendance=attendance_data,
+            total_hours=total_hours_data
+        )
+    except Exception as e:
+        return f"Error: {e}", 500
+
+
+@app.route("/edit_attendance/<int:attendance_id>", methods=["GET", "POST"])
+def edit_attendance(attendance_id):
+    try:
+        conn = sqlite3.connect("sales.db")
+        cursor = conn.cursor()
+
+        if request.method == "POST":
+            # Update attendance record
+            date = request.form.get("date")
+            clock_in_time = request.form.get("clock_in_time")
+            clock_out_time = request.form.get("clock_out_time")
+
+            cursor.execute("""
+                UPDATE employee_attendance
+                SET date = ?, clock_in_time = ?, clock_out_time = ?
+                WHERE id = ?
+            """, (date, clock_in_time, clock_out_time, attendance_id))
+            conn.commit()
+            conn.close()
+
+            return redirect(url_for("attendance"))
+
+        # Fetch the attendance record
+        cursor.execute("SELECT id, date, clock_in_time, clock_out_time FROM employee_attendance WHERE id = ?", (attendance_id,))
+        record = cursor.fetchone()
+        conn.close()
+
+        return render_template("edit_attendance.html", record=record)
+    except Exception as e:
+        return f"Error: {e}", 500
+
+@app.route("/summary", methods=["GET"])
+def summary():
+    try:
+        conn = sqlite3.connect("sales.db")
+        cursor = conn.cursor()
+
+        # Fetch daily summaries
+        cursor.execute("""
+            SELECT date, SUM(total_sale), SUM(tips), SUM(tax), SUM(expense), SUM(profit)
+            FROM sales
+            GROUP BY date
+            ORDER BY date DESC
+        """)
+        daily_summaries = cursor.fetchall()
+
+        # Calculate daily totals
+        cursor.execute("""
+            SELECT SUM(total_sale), SUM(tips), SUM(tax), SUM(expense), SUM(profit)
+            FROM sales
+        """)
+        daily_totals = cursor.fetchone()
+
+        # Fetch monthly summaries
+        cursor.execute("""
+            SELECT strftime('%Y-%m', date) AS month, SUM(total_sale), SUM(tips), SUM(tax), SUM(expense), SUM(profit)
             FROM sales
             GROUP BY month
             ORDER BY month DESC
-        ''')
-        monthly_data = cursor.fetchall()
-
-        conn.close()
-
-        return render_template('monthly_report.html', monthly_data=monthly_data)
-    except Exception as e:
-        app.logger.error(f"Error generating monthly report: {e}")
-        return f"An error occurred: {e}", 500
-@app.route('/debug_expenses', methods=['GET'])
-def debug_expenses():
-    try:
-        # Connect to the database
-        conn = sqlite3.connect('sales.db')
-        cursor = conn.cursor()
-        
-        # Fetch all expenses
-        cursor.execute('SELECT * FROM expenses ORDER BY date DESC')
-        expenses = cursor.fetchall()
-        conn.close()
-        
-        # Return the data as JSON
-        return {'expenses': expenses}, 200
-    except Exception as e:
-        app.logger.error(f"Error fetching expenses: {e}")
-        return {'error': str(e)}, 500
-
-@app.route('/summary', methods=['GET'])
-def summary():
-    try:
-        conn = sqlite3.connect('sales.db')
-        cursor = conn.cursor()
-
-        # Daily summary query
-        cursor.execute('''
-            SELECT 
-                date,
-                SUM(total_sale) AS total_sales,
-                SUM(tips) AS total_tips,
-                SUM(tax) AS total_tax,
-                SUM(expense) AS total_expense,
-                SUM(profit) AS total_profit
-            FROM sales
-            GROUP BY date
-            ORDER BY date
-        ''')
-        daily_summaries = cursor.fetchall()
-
-        # Monthly summary query
-        cursor.execute('''
-            SELECT 
-                SUBSTR(date, 1, 7) AS month,  -- Extract YYYY-MM
-                SUM(total_sale) AS total_sales,
-                SUM(tips) AS total_tips,
-                SUM(tax) AS total_tax,
-                SUM(expense) AS total_expense,
-                SUM(profit) AS total_profit
-            FROM sales
-            GROUP BY month
-            ORDER BY month
-        ''')
+        """)
         monthly_summaries = cursor.fetchall()
+
+        # Calculate monthly totals
+        cursor.execute("""
+            SELECT SUM(total_sale), SUM(tips), SUM(tax), SUM(expense), SUM(profit)
+            FROM sales
+        """)
+        monthly_totals = cursor.fetchone()
+
+        # Fetch total online sales
+        cursor.execute("SELECT SUM(sale_amount) FROM online_sales")
+        total_online_sales = cursor.fetchone()[0] or 0.0
+
+        # Fetch total expenses from sales and other sources
+        cursor.execute("""
+            SELECT SUM(expense) FROM sales
+        """)
+        total_sales_expenses = cursor.fetchone()[0] or 0.0
+
+        # Fetch total other expenses
+        try:
+            cursor.execute("""
+                SELECT SUM(amount) FROM other_expenses
+            """)
+            total_other_expenses = cursor.fetchone()[0] or 0.0
+        except sqlite3.OperationalError:
+            # Handle missing other_expenses table
+            total_other_expenses = 0.0
+
+        total_expenses = total_sales_expenses + total_other_expenses
+
+        # Integrate online sales into overall totals
+        overall_total_sales = (daily_totals[0] or 0.0) + total_online_sales
+        overall_total_profit = overall_total_sales - total_expenses
+
         conn.close()
 
-        # Render the summary template
+        # Render the summary page
         return render_template(
             "summary.html",
             daily_summaries=daily_summaries,
+            daily_totals={
+                "sales": daily_totals[0] or 0.0,
+                "tips": daily_totals[1] or 0.0,
+                "tax": daily_totals[2] or 0.0,
+                "expenses": daily_totals[3] or 0.0,
+                "profit": daily_totals[4] or 0.0
+            },
             monthly_summaries=monthly_summaries,
+            monthly_totals={
+                "sales": monthly_totals[0] or 0.0,
+                "tips": monthly_totals[1] or 0.0,
+                "tax": monthly_totals[2] or 0.0,
+                "expenses": monthly_totals[3] or 0.0,
+                "profit": monthly_totals[4] or 0.0
+            },
+            total_online_sales=total_online_sales,
+            overall_totals={
+                "sales": overall_total_sales,
+                "expenses": total_expenses,
+                "profit": overall_total_profit
+            }
         )
-    except sqlite3.Error as db_error:
-        app.logger.error(f"Database error in /summary route: {db_error}")
-        return f"Database error: {db_error}", 500
     except Exception as e:
-        app.logger.error(f"Unexpected error in /summary route: {e}")
-        return f"Unexpected error: {e}", 500
-#delete expense
-@app.route('/delete_expense', methods=['POST'])
-def delete_expense():
+        return f"Error: {e}", 500
+
+
+
+
+@app.route("/online_sale", methods=["GET", "POST"])
+def online_sale():
     try:
-        expense_id = request.form['delete_id']  # Get the expense ID from the form
-        conn = sqlite3.connect('sales.db')
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM expenses WHERE id = ?', (expense_id,))
-        conn.commit()
-        conn.close()
-        return redirect('/expense_management')  # Redirect back to the expense management page
-    except Exception as e:
-        app.logger.error(f"Error deleting expense: {e}")
-        return f"An error occurred: {e}", 500
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Daily sale report
-@app.route("/daily_sales_report")
-def daily_sales_report():
-    try:
-        # Connect to the database
         conn = sqlite3.connect("sales.db")
         cursor = conn.cursor()
 
-        # Query to fetch sales for today
-        cursor.execute(
-            """
-            SELECT date, SUM(cash_sale), SUM(card_sale), SUM(total_sale), SUM(tips), SUM(tax), SUM(expense), SUM(profit)
-            FROM sales
-            WHERE date = DATE('now')
-            GROUP BY date
-        """
-        )
-        report = cursor.fetchone()  # Fetch today's report
+        if request.method == "POST":
+            # Add a new online sale
+            platform = request.form.get("platform")
+            sale_amount = float(request.form.get("sale_amount"))
+            sale_date = request.form.get("sale_date")
+
+            cursor.execute("""
+                INSERT INTO online_sales (platform, sale_amount, sale_date)
+                VALUES (?, ?, ?)
+            """, (platform, sale_amount, sale_date))
+            conn.commit()
+
+        # Fetch all online sales
+        cursor.execute("""
+            SELECT id, platform, sale_amount, sale_date
+            FROM online_sales
+            ORDER BY sale_date DESC
+        """)
+        online_sales = cursor.fetchall()
+
+        # Calculate total online sales
+        cursor.execute("SELECT SUM(sale_amount) FROM online_sales")
+        total_online_sales = cursor.fetchone()[0] or 0.0
 
         conn.close()
 
-        # If no sales are found, display a default message
-        if not report:
-            report = ["No sales recorded for today.", 0, 0, 0, 0, 0, 0, 0]
-
-        # Render the report on a template
-        return render_template("daily_sales_report.html", report=report)
+        return render_template(
+            "online_sale.html",
+            online_sales=online_sales,
+            total_online_sales=total_online_sales
+        )
     except Exception as e:
-        app.logger.error(f"Error generating daily sales report: {e}")
-        return f"An error occurred while generating the daily sales report: {e}", 500
+        return f"Error: {e}", 500
+
+
+@app.route("/delete_online_sale/<int:sale_id>", methods=["POST"])
+def delete_online_sale(sale_id):
+    try:
+        conn = sqlite3.connect("sales.db")
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM online_sales WHERE id = ?", (sale_id,))
+        conn.commit()
+        conn.close()
+        return redirect(url_for("online_sale"))
+    except Exception as e:
+        return f"Error: {e}", 500
+@app.route("/pay_employee/<int:employee_id>", methods=["POST"])
+def pay_employee(employee_id):
+    try:
+        conn = sqlite3.connect("sales.db")
+        cursor = conn.cursor()
+
+        # Mark clock entries as inactive
+        cursor.execute("""
+            UPDATE employee_attendance
+            SET active = 0
+            WHERE employee_id = ? AND active = 1
+        """, (employee_id,))
+
+        # Log the pay cycle
+        paid_date = datetime.now().strftime("%Y-%m-%d")
+        cursor.execute("""
+            INSERT INTO pay_cycles (employee_id, start_date, end_date, paid_date)
+            VALUES (
+                ?, 
+                (SELECT MIN(date) FROM employee_attendance WHERE employee_id = ? AND active = 0),
+                (SELECT MAX(date) FROM employee_attendance WHERE employee_id = ? AND active = 0),
+                ?
+            )
+        """, (employee_id, employee_id, employee_id, paid_date))
+
+        conn.commit()
+        conn.close()
+
+        # Redirect to the employee list with a success message
+        return redirect(url_for("employees", message="Employee paid successfully!"))
+    except Exception as e:
+        # Redirect with an error message
+        return redirect(url_for("employees", message=f"Error: {str(e)}"))
+
+
+@app.route("/restart_clock/<int:employee_id>", methods=["POST"])
+def restart_clock(employee_id):
+    try:
+        conn = sqlite3.connect("sales.db")
+        cursor = conn.cursor()
+
+        # Restart clock entries by setting active back to 1
+        cursor.execute("""
+            UPDATE employee_attendance
+            SET active = 1
+            WHERE employee_id = ? AND active = 0
+        """, (employee_id,))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({"success": True, "message": "Clock restarted for employee."})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+
+@app.route("/add_salary/<int:employee_id>", methods=["POST", "GET"])
+def add_salary(employee_id):
+    if request.method == "GET":
+        # Render a page to input salary details
+        conn = sqlite3.connect("sales.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, designation FROM employees WHERE id = ?", (employee_id,))
+        employee = cursor.fetchone()
+        conn.close()
+        return render_template("add_salary.html", employee=employee)
+    elif request.method == "POST":
+        try:
+            # Add salary and stop the clock
+            salary_date = request.form.get("salary_date")
+            salary_amount = request.form.get("salary_amount")
+            payment_method = request.form.get("payment_method")
+
+            conn = sqlite3.connect("sales.db")
+            cursor = conn.cursor()
+
+            # Insert salary into a salary table (if not already created, create it first)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS employee_salary (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    employee_id INTEGER,
+                    date TEXT,
+                    amount REAL,
+                    method TEXT,
+                    FOREIGN KEY (employee_id) REFERENCES employees(id)
+                )
+            """)
+            cursor.execute("""
+                INSERT INTO employee_salary (employee_id, date, amount, method)
+                VALUES (?, ?, ?, ?)
+            """, (employee_id, salary_date, salary_amount, payment_method))
+
+            # Stop the clock for the employee
+            cursor.execute("""
+                UPDATE employee_attendance
+                SET active = 0
+                WHERE employee_id = ? AND active = 1
+            """, (employee_id,))
+
+            conn.commit()
+            conn.close()
+
+            return redirect(url_for("employees", message="Salary added and clock stopped successfully!"))
+        except Exception as e:
+            return redirect(url_for("employees", message=f"Error: {str(e)}"))
+
+import csv
+from flask import Response
+
+@app.route("/export_sales", methods=["GET"])
+def export_sales():
+    try:
+        conn = sqlite3.connect("sales.db")
+        cursor = conn.cursor()
+
+        # Fetch all valid sales data
+        cursor.execute("""
+            SELECT id, date, total_sale, cash_sale, card_sale, tips, tax, expense, profit
+            FROM sales
+            WHERE total_sale > 0
+        """)
+        sales = cursor.fetchall()
+        conn.close()
+
+        # Create CSV in memory
+        output = []
+        header = ["Sale ID", "Date", "Total Sale", "Cash Sale", "Card Sale", "Tips", "Tax", "Expense", "Profit"]
+        output.append(header)
+
+        for sale in sales:
+            # Format the date dynamically based on its structure
+            try:
+                if " " in sale[1]:  # Date includes time
+                    formatted_date = datetime.strptime(sale[1], "%Y-%m-%d %H:%M:%S").strftime("%m/%d/%Y")
+                else:  # Date without time
+                    formatted_date = datetime.strptime(sale[1], "%Y-%m-%d").strftime("%m/%d/%Y")
+            except Exception as e:
+                formatted_date = sale[1]  # If formatting fails, use the raw value
+
+            row = (sale[0], formatted_date, *sale[2:])
+            output.append(row)
+
+        # Convert list to CSV format
+        def generate_csv():
+            for row in output:
+                yield ','.join(map(str, row)) + '\n'
+
+        # Create response with CSV data
+        response = Response(generate_csv(), mimetype="text/csv")
+        response.headers["Content-Disposition"] = "attachment; filename=sales.csv"
+        return response
+
+    except Exception as e:
+        return f"Error: {e}", 500
+
+@app.route("/expense_management", methods=["GET", "POST"])
+def expense_management():
+    try:
+        conn = sqlite3.connect("sales.db")
+        cursor = conn.cursor()
+
+        if request.method == "POST":
+            # Retrieve form data
+            description = request.form.get("description")
+            amount = request.form.get("amount")
+            expense_date = request.form.get("expense_date")
+            category = request.form.get("category")
+
+            # Ensure table has the correct schema
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS other_expenses (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    expense_date TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    description TEXT,
+                    category TEXT
+                )
+            """)
+            
+            # Insert new expense
+            cursor.execute("""
+                INSERT INTO other_expenses (expense_date, amount, description, category)
+                VALUES (?, ?, ?, ?)
+            """, (expense_date, amount, description, category))
+            conn.commit()
+
+        # Fetch all expenses
+        cursor.execute("""
+            SELECT id, expense_date, amount, description, category
+            FROM other_expenses
+            ORDER BY expense_date DESC
+        """)
+        expenses = cursor.fetchall()
+        conn.close()
+
+        return render_template("expense_management.html", expenses=expenses)
+    except Exception as e:
+        return f"Error: {e}", 500
+
+@app.route("/delete_expense/<int:expense_id>", methods=["POST"])
+def delete_expense(expense_id):
+    try:
+        conn = sqlite3.connect("sales.db")
+        cursor = conn.cursor()
+
+        # Delete the expense with the given ID
+        cursor.execute("DELETE FROM other_expenses WHERE id = ?", (expense_id,))
+        conn.commit()
+        conn.close()
+
+        # Redirect back to the expense management page
+        return redirect(url_for("expense_management"))
+    except Exception as e:
+        return f"Error: {e}", 500
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Default to 5000 if PORT is not set
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)

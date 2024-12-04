@@ -1,0 +1,18 @@
+<h1>Monthly Sales Report</h1>
+<table>
+    <thead>
+        <tr>
+            <th>Month</th>
+            <th>Total Sales</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for report in reports %}
+        <tr>
+            <td>{{ report[0] }}</td>
+            <td>${{ report[1] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<a href="/view_sales">Back to Sales</a>

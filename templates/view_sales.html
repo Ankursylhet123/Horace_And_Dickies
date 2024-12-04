@@ -3,157 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>View Sales</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Inline Styles -->
-    <style>
-        body {
-            background-color: #f8f9fa;
-        }
-
-        .table-container {
-            margin-top: 30px;
-        }
-
-        .sales-header {
-            text-align: center;
-            margin: 30px 0;
-            font-size: 2.5rem;
-            font-weight: bold;
-        }
-
-        .table {
-            background-color: #ffffff;
-            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .table th {
-            background-color: #007bff;
-            color: white;
-        }
-
-        .btn-export {
-            margin-top: 20px;
-        }
-
-        .btn-home {
-            margin-top: 20px;
-            margin-right: 10px;
-        }
-
-        .chart-container {
-            margin-top: 50px;
-            background-color: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-        }
-    </style>
-    <!-- Chart.js Library -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Sales Summary</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <h1 class="sales-header">Sales Summary</h1>
-
+    <div class="container mt-5">
         <!-- Navigation Buttons -->
-        <div class="text-center">
-            <a href="/" class="btn btn-primary btn-home">Home</a>
-            <a href="/export_sales" class="btn btn-danger btn-export">Export Sales Data</a>
+        <div class="mb-3">
+            <a href="/" class="btn btn-secondary">Home</a>
+            <a href="/add_sale" class="btn btn-primary">Add New Sale</a>
         </div>
 
-        <!-- Table Container -->
-        <div class="table-container">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Cash Sale</th>
-                        <th>Card Sale</th>
-                        <th>Total Sale</th>
-                        <th>Tips</th>
-                        <th>Tax</th>
-                        <th>Expense</th>
-                        <th>Profit</th>
-                        <th>Online Sale</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for sale in sales %}
-                    <tr>
-                        <td>{{ sale[1] }}</td>
-                        <td>${{ sale[2] }}</td>
-                        <td>${{ sale[3] }}</td>
-                        <td>${{ sale[4] }}</td>
-                        <td>${{ sale[5] }}</td>
-                        <td>${{ sale[6] }}</td>
-                        <td>${{ sale[7] }}</td>
-                        <td>${{ sale[8] }}</td>
-                        <td>${{ sale[9] }}</td>
-                        <td>
-                            <form method="POST" action="/delete_sale" style="display:inline;">
-                                <input type="hidden" name="sale_id" value="{{ sale[0] }}">
-                                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Chart Container -->
-        <div class="chart-container">
-            <canvas id="salesChart"></canvas>
-        </div>
+        <!-- Sales Summary Section -->
+        <h1 class="mb-4">Sales Summary</h1>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Sale ID</th>
+                    <th>Date</th>
+                    <th>Cash Sale</th>
+                    <th>Card Sale</th>
+                    <th>Total Sale</th>
+                    <th>Tips</th>
+                    <th>Tax</th>
+                    <th>Expense</th>
+                    <th>Profit</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in sales %}
+                <tr>
+                    <td>{{ sale[0] }}</td>
+                    <td>{{ sale[1] }}</td>
+                    <td>${{ sale[3] }}</td>
+                    <td>${{ sale[4] }}</td>
+                    <td>${{ sale[2] }}</td>
+                    <td>${{ sale[5] }}</td>
+                    <td>${{ sale[6] }}</td>
+                    <td>${{ sale[7] }}</td>
+                    <td>${{ sale[8] }}</td>
+                    <td>
+                        <a href="/edit_sale/{{ sale[0] }}" class="btn btn-sm btn-warning">Edit</a>
+                        <form action="/delete_sale/{{ sale[0] }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-
-    <!-- Chart Script -->
-    <script>
-        const ctx = document.getElementById('salesChart').getContext('2d');
-        const salesChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: {{ dates | safe }},
-                datasets: [{
-                    label: 'Daily Sales',
-                    data: {{ daily_totals | safe }},
-                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        enabled: true
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Sales Amount ($)'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Date'
-                        }
-                    }
-                }
-            }
-        });
-    </script>
 </body>
 </html>
